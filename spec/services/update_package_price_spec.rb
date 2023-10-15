@@ -3,40 +3,58 @@
 require "spec_helper"
 
 RSpec.describe UpdatePackagePrice do
+  PackageWithMunicipality = Struct.new(:package, :municipality, :package_municipality, keyword_init: true)
+  def create_package_with_municipality(package_name:, municipality_name:, price_cents:)
+    package = Package.create!(name: package_name)
+    municipality = Municipality.create!(name: municipality_name)
+    package_municipality = package.package_municipalities.create!(municipality: municipality, price_cents: price_cents)
+
+    PackageWithMunicipality.new(package: package, municipality: municipality, package_municipality: package_municipality)
+  end
+
   it "updates the current price of the provided package" do
     package = Package.create!(name: "Dunderhonung")
+    municipality_name = "Göteborg"
 
-    UpdatePackagePrice.call(package, 200_00)
-    expect(package.reload.price_cents).to eq(200_00)
+    UpdatePackagePrice.call(package, 200_00, municipality_name: municipality_name)
+    expect(package.price_for(municipality_name)).to eq(200_00)
   end
 
   it "only updates the passed package price" do
-    package = Package.create!(name: "Dunderhonung")
-    other_package = Package.create!(name: "Farmors köttbullar", price_cents: 100_00)
+    factory = create_package_with_municipality(
+      package_name: "Dunderhonung",
+      municipality_name: "Göteborg",
+      price_cents: 100_00
+    )
+    other_municipality_name = "Jönköping"
 
     expect {
-      UpdatePackagePrice.call(package, 200_00)
+      UpdatePackagePrice.call(factory.package, 200_00, municipality_name: other_municipality_name)
     }.not_to change {
-      other_package.reload.price_cents
+      factory.package_municipality.reload.price_cents
     }
   end
 
   it "stores the old price of the provided package in its price history" do
-    package = Package.create!(name: "Dunderhonung", price_cents: 100_00)
+    factory = create_package_with_municipality(
+      package_name: "Dunderhonung",
+      municipality_name: "Göteborg",
+      price_cents: 100_00
+    )
 
-    UpdatePackagePrice.call(package, 200_00)
-    expect(package.prices).to be_one
-    price = package.prices.first
+    UpdatePackagePrice.call(factory.package, 200_00, municipality_name: "Göteborg")
+    expect(factory.package.prices).to be_one
+    price = factory.package.prices.first
     expect(price.price_cents).to eq(100_00)
   end
 
   # This tests covers feature request 1. Feel free to add more tests or change
   # the existing one.
 
-  xit "supports adding a price for a specific municipality" do
+  it "supports adding a price for a specific municipality" do
     package = Package.create!(name: "Dunderhonung")
 
-    UpdatePackagePrice.call(package, 200_00, municipality: "Göteborg")
+    UpdatePackagePrice.call(package, 200_00, municipality_name: "Göteborg")
 
     # You'll need to implement Package#price_for
     expect(package.price_for("Göteborg")).to eq(200_00)
