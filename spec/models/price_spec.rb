@@ -14,4 +14,10 @@ RSpec.describe Price do
     expect(price.validate).to eq(false)
     expect(price.errors[:package]).to be_present
   end
+
+  it "validates the presence of municipality" do
+    price = Price.new
+    expect(price.validate).to eq(false)
+    expect(price.errors[:municipality]).to be_present
+  end
 end
